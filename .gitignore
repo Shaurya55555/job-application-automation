@@ -1,0 +1,5 @@
+mail/gmail_app_password.txt
+mail/.gmail_app_password
+mail_log.csv
+__pycache__/
+*.pyc

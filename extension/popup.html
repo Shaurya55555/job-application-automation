@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 13px system-ui; width: 360px; margin: 0; padding: 12px; }
+  h3 { margin: 0 0 8px; }
+  label { display: block; margin: 6px 0 2px; color: #444; font-size: 12px; }
+  input[type=text], textarea { width: 100%; box-sizing: border-box; padding: 5px; }
+  button { padding: 8px 12px; margin: 8px 4px 0 0; cursor: pointer; }
+  #fill { background: #2563eb; color: #fff; border: 0; border-radius: 6px; font-weight: 600; }
+  #status { margin-top: 8px; color: #166534; min-height: 16px; }
+  .qa { display: flex; gap: 4px; margin-bottom: 4px; }
+  .qa input { flex: 1; }
+  details { margin-top: 10px; }
+  #fields { max-height: 300px; overflow-y: auto; padding-right: 4px; }
+</style>
+</head>
+<body>
+  <h3>Shaurya Autofill</h3>
+  <button id="fill">Fill this page</button>
+  <button id="save">Save profile</button>
+  <div id="status"></div>
+
+  <details open>
+    <summary>Profile fields</summary>
+    <div id="fields"></div>
+  </details>
+
+  <details>
+    <summary>Custom Q&amp;A (keyword/regex &rarr; answer)</summary>
+    <div id="qa"></div>
+    <button id="addqa">+ Add</button>
+  </details>
+
+  <details>
+    <summary>Resume PDF (auto-attached to resume/CV uploads)</summary>
+    <input type="file" id="resume" accept="application/pdf">
+    <div id="resumeName"></div>
+  </details>
+
+  <label><input type="checkbox" id="overwrite"> Overwrite fields that already have a value</label>
+
+  <script src="defaults.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
