@@ -130,7 +130,10 @@
 
   function pickOption(options, wanted) {
     const w = norm(wanted);
-    return options.find((o) => norm(o.text) === w) || options.find((o) => norm(o.text).includes(w) || (w.length > 2 && w.includes(norm(o.text)) && norm(o.text).length > 1));
+    const hit = options.find((o) => norm(o.text) === w) || options.find((o) => norm(o.text).includes(w) || (w.length > 2 && w.includes(norm(o.text)) && norm(o.text).length > 1));
+    if (hit || !/immediate/.test(w)) return hit;
+    // "immediately available" -> the shortest notice-period bucket the form offers
+    return options.find((o) => /immediate|no notice|less than (15|30)|0 ?(-|to) ?(15|30)|up to (15|30)|within (15|30)/.test(norm(o.text)));
   }
 
 
@@ -625,7 +628,7 @@
     }
     const profile = stored.profile;
     if (!profile) return { filled: 0, error: "Open the extension popup and save your profile first." };
-    profile.fields = { dob: "2004-11-29", ...profile.fields }; // profiles saved before this field existed
+    profile.fields = { dob: "2004-11-29", noticePeriod: "Immediately available", ...profile.fields }; // profiles saved before this field existed
     const total = (profile.experience && profile.experience.length ? profile.experience : DEFAULT_EXPERIENCE).length;
     skillsDone = false;
     let r = await fill(profile);

@@ -21,7 +21,7 @@ const FIELD_DEFS = [
   { key: "currentCompany", label: "Current company", value: "Marine Edge", patterns: ["current (company|employer|organi[sz]ation)", "company name", "employer"] },
   { key: "currentTitle", label: "Current title", value: "SDE Intern", patterns: ["current (title|role|designation)", "job title", "designation"] },
   { key: "experience", label: "Years of experience", value: "", patterns: ["years? of (work )?experience", "total experience", "experience \\(years\\)"] },
-  { key: "noticePeriod", label: "Notice period", value: "", patterns: ["notice period", "joining (time|date)", "available (from|to join)"] },
+  { key: "noticePeriod", label: "Notice period", value: "Immediately available", patterns: ["notice period", "joining (time|date)", "available (from|to join)"] },
   { key: "currentCtc", label: "Current CTC", value: "", patterns: ["current (ctc|salary|compensation)"] },
   { key: "stipend", label: "Expected stipend / month (INR)", value: "40000-50000", patterns: ["stipend"] },
   { key: "expectedCtc", label: "Expected CTC (INR / year)", value: "1000000-1200000", patterns: ["expected (ctc|salary|compensation)", "salary expectation", "ctc", "lpa", "compensation"] },
