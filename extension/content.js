@@ -21,7 +21,7 @@
     { key: "currentCtc", patterns: ["current (ctc|salary|compensation)"] },
     { key: "stipend", patterns: ["stipend"] },
     { key: "expectedCtc", patterns: ["expected (ctc|salary|compensation)", "salary expectation", "ctc", "lpa", "compensation"] },
-    { key: "branch", patterns: ["branch", "major", "specialization", "stream", "discipline"] },
+    { key: "branch", patterns: ["field of study", "branch", "major", "specialization", "stream", "discipline"] },
     { key: "degree", patterns: ["degree", "qualification"] },
     { key: "college", patterns: ["college", "university", "institute", "school name", "institution"] },
     { key: "state", patterns: ["^state", "province"] },
@@ -113,25 +113,247 @@
     return options.find((o) => norm(o.text) === w) || options.find((o) => norm(o.text).includes(w) || (w.length > 2 && w.includes(norm(o.text)) && norm(o.text).length > 1));
   }
 
+
+  // ---- work experience / education sections ----
+  const DEFAULT_EXPERIENCE = [
+    { title: "SDE Intern", company: "Marine Edge", location: "Bengaluru", from: "2025-03", to: "2026-01", current: false,
+      description: "- Engineered a full-stack web platform serving 7,000+ users globally, owning features from the React UI to Node.js REST APIs\n- Integrated the Razorpay REST API and automated deployment with CI/CD, shipping frequent updates with fewer manual steps\n- Built role-based access control (RBAC) and tuned queries and indexes for a 30% faster load speed\n- Diagnosed production issues through log analysis to root cause rather than surface symptoms" },
+    { title: "Frontend Web Developer Intern", company: "APJ Academy", location: "Bengaluru", from: "2024-08", to: "2025-02", current: false,
+      description: "- Optimized database queries, reducing data retrieval latency by 25% through query and index analysis\n- Implemented real-time data synchronization over WebSockets for low-latency updates\n- Built responsive UIs in React.js, collaborating with the team on code reviews and quality" }
+  ];
+
+  function sectionOf(el) {
+    let found = null;
+    for (const h of document.querySelectorAll('h1,h2,h3,h4,h5,h6,legend,[role="heading"]')) {
+      if (h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) found = h; else break;
+    }
+    if (!found) return "";
+    const t = norm(found.innerText);
+    if (/education|academic|qualification/.test(t)) return "education";
+    if (/experience|employment|internship|work history/.test(t)) return "experience";
+    return "";
+  }
+
+  function fmtDate(iso, el) {
+    if (!iso) return "";
+    const [y, m] = iso.split("-");
+    if (el.type === "month") return `${y}-${m}`;
+    if (el.type === "date") return `${y}-${m}-01`;
+    const ph = (el.getAttribute("placeholder") || "").toLowerCase();
+    if (ph.includes("dd/mm/yyyy")) return `01/${m}/${y}`;
+    if (ph.includes("mm/dd/yyyy")) return `${m}/01/${y}`;
+    if (/yyyy-mm/.test(ph)) return `${y}-${m}`;
+    if (/mmm|month/.test(ph) && !/mm\/yyyy/.test(ph)) return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m - 1]} ${y}`;
+    return `${m}/${y}`;
+  }
+
+  function isDateLike(el, label) {
+    if (el.type === "date" || el.type === "month") return true;
+    const ph = (el.getAttribute("placeholder") || "").toLowerCase();
+    return /mm\s*[\/-]\s*yyyy|dd\s*[\/-]\s*mm|mm\s*[\/-]\s*dd|yyyy\s*[\/-]\s*mm/.test(ph) || /^(from|to)\b|start date|end date/.test(label);
+  }
+
+  function expKind(el, label) {
+    if (isDateLike(el, label)) return "date";
+    if (el.tagName === "TEXTAREA" || /descri|responsibilit|duties|summary|achievement/.test(label)) return "desc";
+    if (/company|employer|organi[sz]ation/.test(label)) return "company";
+    if (/job title|position|designation|^title|^role\b/.test(label)) return "title";
+    if (/location|city/.test(label)) return "location";
+    return null;
+  }
+
+  // Index every field in document order (filled or not) so block N always gets entry N.
+  function indexSections(fields) {
+    const map = new Map();
+    const c = { desc: 0, company: 0, title: 0, location: 0, from: 0, to: 0, date: 0, eduFrom: 0, eduTo: 0 };
+    for (const el of fields) {
+      if (!visible(el)) continue;
+      const label = labelFor(el);
+      const sect = sectionOf(el);
+      const wd = /dateSection(Month|Year)/i.exec(el.getAttribute("data-automation-id") || "");
+      if (wd && (sect === "experience" || sect === "education")) {
+        const part = wd[1].toLowerCase();
+        const ck = "wd_" + part;
+        const pair = (c[ck] = (c[ck] ?? -1) + 1);
+        map.set(el, { sect, kind: pair % 2 === 0 ? "from" : "to", idx: Math.floor(pair / 2), part });
+        continue;
+      }
+      if (sect === "experience") {
+        const kind = expKind(el, label);
+        if (!kind) continue;
+        if (kind === "date") {
+          let role = /^from\b|start|joined/.test(label) ? "from" : /^to\b|end|until/.test(label) ? "to" : null;
+          if (!role) role = c.date % 2 === 0 ? "from" : "to";
+          c.date++;
+          map.set(el, { sect, kind: role, idx: c[role]++ });
+        } else map.set(el, { sect, kind, idx: c[kind]++ });
+      } else if (sect === "education" && isDateLike(el, label)) {
+        const role = /^to\b|end|graduat/.test(label) ? "to" : /^from\b|start/.test(label) ? "from" : (c.eduFrom <= c.eduTo ? "from" : "to");
+        role === "from" ? c.eduFrom++ : c.eduTo++;
+        map.set(el, { sect, kind: role, idx: 0 });
+      }
+    }
+    return map;
+  }
+
+  function sectionalValue(el, info, profile) {
+    if (!info) return null;
+    const exps = profile.experience && profile.experience.length ? profile.experience : DEFAULT_EXPERIENCE;
+    if (info.part) {
+      let iso;
+      if (info.sect === "education") {
+        if (info.idx > 0) return null;
+        iso = info.kind === "from" ? (profile.fields.eduFrom || "2023-08") : (profile.fields.eduTo || "2027-08");
+      } else {
+        const e = exps[info.idx];
+        if (!e || (info.kind === "to" && e.current)) return null;
+        iso = info.kind === "from" ? e.from : e.to;
+      }
+      if (!iso) return null;
+      const [y, m] = iso.split("-");
+      return info.part === "month" ? m : y;
+    }
+    if (info.sect === "education") {
+      return fmtDate(info.kind === "from" ? (profile.fields.eduFrom || "2023-08") : (profile.fields.eduTo || "2027-08"), el);
+    }
+    const e = exps[info.idx];
+    if (!e) return null;
+    switch (info.kind) {
+      case "desc": return e.description;
+      case "company": return e.company;
+      case "title": return e.title;
+      case "location": return e.location;
+      case "from": return fmtDate(e.from, el) || null;
+      case "to": return e.current ? null : fmtDate(e.to, el) || null;
+    }
+    return null;
+  }
+
+  // Types a date char by char so masked / controlled date inputs accept it.
+  async function typeDate(el, str) {
+    const digits = (v) => (v || "").replace(/\D/g, "");
+    el.click();
+    if (await writeValue(el, str) && digits(el.value) === digits(str)) return;
+    const attempt = async (text) => {
+      el.click();
+      el.focus();
+      if (el.select) el.select();
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+      setter.call(el, "");
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "deleteContentBackward" }));
+      let cur = "";
+      for (const ch of text) {
+        el.dispatchEvent(new KeyboardEvent("keydown", { key: ch, bubbles: true }));
+        el.dispatchEvent(new KeyboardEvent("keypress", { key: ch, bubbles: true }));
+        cur += ch;
+        setter.call(el, cur);
+        el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: ch }));
+        el.dispatchEvent(new KeyboardEvent("keyup", { key: ch, bubbles: true }));
+        await sleep(15);
+      }
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+      el.dispatchEvent(new Event("blur", { bubbles: true }));
+      await sleep(120);
+    };
+    await attempt(str);
+    if (digits(el.value) !== digits(str)) await attempt(digits(str)); // mask inserts the slash itself
+    if (digits(el.value) !== digits(str)) {
+      setNative(el, str); // last resort
+      console.debug("[autofill] date field rejected typed value", el.value, "wanted", str);
+    }
+  }
+
+  // ---- typeahead (type, wait, pick suggestion / press Enter) ----
+  function visibleSuggestions() {
+    return [...document.querySelectorAll('[role="option"], [role="listbox"] li, ul.ui-autocomplete li, .autocomplete-suggestions div, [class*="suggest"] li, [class*="option"], [role="radio"], label:has(input[type="radio"]), [role="menuitem"], [data-automation-id="promptOption"], [data-automation-id="menuItem"]')]
+      .filter((o) => visible(o) && norm(o.innerText).length > 0 && o.offsetHeight < 120);
+  }
+  async function typeahead(el, attempts, fallbackOther, waitMs = 900) {
+    let sawOptions = false;
+    for (const text of attempts) {
+      await writeValue(el, text);
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: text.slice(-1), bubbles: true }));
+      el.dispatchEvent(new KeyboardEvent("keyup", { key: text.slice(-1), bubbles: true }));
+      await sleep(waitMs);
+      const opts = visibleSuggestions();
+      if (opts.length) sawOptions = true;
+      const want = norm(text);
+      const hit = opts.find((o) => norm(o.innerText) === want) || opts.find((o) => norm(o.innerText).includes(want)) || (text === "Other" ? opts[0] : null);
+      if (hit) { hit.click(); await sleep(250); return true; }
+      for (const t of ["keydown", "keyup"]) el.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+      await sleep(400);
+      if (norm(el.value) && opts.length) return true;
+    }
+    if (fallbackOther && sawOptions) {
+      // dropdown exists but nothing matched: follow the page's "type Other" instruction
+      setNative(el, "Other");
+      await sleep(700);
+      const o = visibleSuggestions()[0];
+      if (o) o.click();
+      return true;
+    }
+    setNative(el, attempts[0]); // no suggestion UI detected: leave the full value in place
+    return false;
+  }
+
+  // Most compatible write: behaves like the user typing (execCommand), falls back to native setter, then per-char typing.
+  async function writeValue(el, val) {
+    const same = () => norm(el.value) === norm(val) || el.value.replace(/\D/g, "") === String(val).replace(/\D/g, "") && /\d/.test(val) && !/[a-z]/i.test(val);
+    el.focus();
+    if (el.select) el.select();
+    try { document.execCommand("delete"); document.execCommand("insertText", false, val); } catch {}
+    await sleep(80);
+    if (same()) { el.dispatchEvent(new Event("change", { bubbles: true })); return true; }
+    setNative(el, val);
+    await sleep(80);
+    return same();
+  }
+
   // ---- filling ----
+  let skillsDone = false;
   async function fill(profile) {
     let filled = 0;
     const skipped = [];
+    const sectionMap = indexSections(document.querySelectorAll('input:not([type]), input[type="text"], input[type="search"], input[type="date"], input[type="month"], textarea'));
 
     // text-like inputs + textareas
-    const inputs = document.querySelectorAll('input:not([type]), input[type="text"], input[type="email"], input[type="tel"], input[type="url"], input[type="number"], input[type="search"], textarea');
+    const inputs = document.querySelectorAll('input:not([type]), input[type="text"], input[type="email"], input[type="tel"], input[type="url"], input[type="number"], input[type="search"], input[type="date"], input[type="month"], textarea');
     for (const el of inputs) {
-      if (el.disabled || el.readOnly || !visible(el)) continue;
-      if (el.value && el.value.trim() && !profile.overwrite) continue;
+      if (el.disabled || (el.readOnly && !sectionMap.has(el)) || !visible(el)) continue;
+      if (el.value && el.value.trim() && !/^[mdy\/\-._\s]+$/i.test(el.value) && !profile.overwrite) continue;
       const label = labelFor(el);
       if (!label) continue;
-      let val = answerFor(label, profile);
+      let val = null;
+      const sect = sectionOf(el);
+      if (/\bskills?\b/.test(label) && !/experience|years|rating|level/.test(label) && profile.fields.skills) {
+        if (skillsDone) continue; // fill() runs several passes; add skills only once per run
+        skillsDone = true;
+        const list = String(profile.fields.skills).split(/[,;]/).map((x) => x.trim()).filter(Boolean).slice(0, 14);
+        for (const skill of list) {
+          await typeahead(el, [skill], false, 600);
+          if (el.value) setNative(el, ""); // not consumed as a tag: clear for the next one
+        }
+        filled++;
+        continue;
+      }
+      const info = sectionMap.get(el);
+      if (info) { val = sectionalValue(el, info, profile); console.debug("[autofill]", info.sect, info.kind, info.idx, "->", val); }
+      if (val == null) val = answerFor(label, profile);
       if (val == null && el.type === "email") val = profile.fields.email;
       if (val == null && el.type === "tel") val = profile.fields.phone;
       if (!val) { skipped.push(label.slice(0, 50)); continue; }
       // number inputs can't hold a range: use the lower bound
       if (el.type === "number") val = (String(val).match(/\d+(\.\d+)?/) || [""])[0];
-      setNative(el, val);
+      if (sect === "education" && /school|university|college|institution/.test(label) && !/degree/.test(label)) {
+        const w = String(val).split(/\s+/);
+        await typeahead(el, [val, w.slice(0, 2).join(" "), w[0]], true);
+      } else if (sect === "education" && /field of study|major|branch|discipline/.test(label)) {
+        await typeahead(el, ["Computer Science", "Computer Engineering", val, "Computer"], false);
+      } else if (info && !info.part && (info.kind === "from" || info.kind === "to") && el.type !== "date" && el.type !== "month") {
+        await typeDate(el, val);
+      } else {
+        await writeValue(el, val);
+      }
       filled++;
     }
 
@@ -142,8 +364,30 @@
       const val = answerFor(label, profile) ?? booleanFor(label);
       if (!val) continue;
       const opts = [...el.options].map((o) => ({ text: o.text, value: o.value }));
-      const hit = pickOption(opts, val);
+      let hit = pickOption(opts, val);
+      if (!hit && /degree|qualification/.test(label)) {
+        for (const syn of ["bachelor degree", "bachelor's degree", "bachelors degree", "bachelor of technology", "bachelor of engineering", "bachelor", "b.tech", "btech", "b.e", "undergraduate", "graduate"]) {
+          hit = pickOption(opts, syn);
+          if (hit) break;
+        }
+      }
       if (hit) { setNative(el, hit.value); filled++; }
+    }
+
+    // custom dropdowns (role=combobox / aria-haspopup=listbox, not <select> or text inputs)
+    for (const trig of document.querySelectorAll('[role="combobox"]:not(input):not(select), [aria-haspopup="listbox"]:not(input):not(select)')) {
+      if (!visible(trig)) continue;
+      const label = labelFor(trig);
+      if (!/degree|qualification/.test(label)) continue;
+      trig.click();
+      await sleep(350);
+      const opts = visibleSuggestions().map((o) => ({ text: o.innerText, el: o }));
+      let hit = null;
+      for (const syn of ["bachelor degree", "bachelor's degree", "bachelor", "b.tech", "undergraduate"]) {
+        hit = pickOption(opts, syn);
+        if (hit) break;
+      }
+      if (hit) { hit.el.click(); filled++; await sleep(200); }
     }
 
     // native radio groups
@@ -158,9 +402,17 @@
       if (hit) { hit.click(); filled++; }
     }
 
-    // native consent checkboxes
+    // native consent checkboxes + "I currently work here"
+    const exps = profile.experience && profile.experience.length ? profile.experience : DEFAULT_EXPERIENCE;
+    let cwIdx = 0;
     for (const cb of document.querySelectorAll('input[type="checkbox"]')) {
-      if (cb.checked || !visible(cb)) continue;
+      if (!visible(cb)) continue;
+      if (/currently (work|working)|present/.test(labelFor(cb))) {
+        const e = exps[cwIdx++];
+        if (e && e.current && !cb.checked) { cb.click(); filled++; }
+        continue;
+      }
+      if (cb.checked) continue;
       if (booleanFor(labelFor(cb), true) === "Yes") { cb.click(); filled++; }
     }
 
@@ -208,10 +460,36 @@
   }
 
   async function run() {
-    const stored = await chrome.storage.local.get(["profile"]);
+    let stored;
+    try {
+      stored = await chrome.storage.local.get(["profile"]);
+    } catch {
+      return { filled: 0, error: "Extension was reloaded. Refresh this page (F5) and try again." };
+    }
     const profile = stored.profile;
     if (!profile) return { filled: 0, error: "Open the extension popup and save your profile first." };
-    return fill(profile);
+    const total = (profile.experience && profile.experience.length ? profile.experience : DEFAULT_EXPERIENCE).length;
+    skillsDone = false;
+    let r = await fill(profile);
+    const titleCount = () => [...document.querySelectorAll("input")].filter((i) => visible(i) && sectionOf(i) === "experience" && /job title|position|designation|^title/.test(labelFor(i))).length;
+    for (let round = 0; round < total - 1; round++) {
+      const before = titleCount();
+      if (before >= total) break;
+      const btn = [...document.querySelectorAll("button,a,[role=button]")].find((b) => /^\s*add (another|more|experience|work)/i.test(b.innerText || "") && sectionOf(b) === "experience");
+      if (!btn) break;
+      btn.click();
+      for (let t = 0; t < 12 && titleCount() <= before; t++) await sleep(250); // wait for new block
+      await sleep(400);
+      for (let pass = 0; pass < 2; pass++) {
+        const r2 = await fill(profile);
+        r.filled += r2.filled;
+        await sleep(300);
+      }
+    }
+    // final sweep: fields that rendered late or were reset by the page
+    const r3 = await fill(profile);
+    r.filled += r3.filled;
+    return r;
   }
 
   // ---- floating button ----
