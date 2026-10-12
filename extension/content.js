@@ -631,6 +631,7 @@
     const profile = stored.profile;
     if (!profile) return { filled: 0, error: "Open the extension popup and save your profile first." };
     profile.fields = { dob: "2004-11-29", noticePeriod: "Immediately available", ...profile.fields };
+    if (!profile.fields.name) profile.fields.name = [profile.fields.firstName || "Shaurya", profile.fields.lastName || "Bajpai"].join(" ");
     if (!profile.fields.currentCtc) profile.fields.currentCtc = "0";
     {
       // current semester from the course start month (two semesters a year), as an ordinal like "7th semester"
