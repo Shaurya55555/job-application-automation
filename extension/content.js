@@ -502,7 +502,9 @@
   }
   function addButton() {
     if (window.top !== window) return;
+    document.getElementById("__shaurya_autofill_btn")?.remove(); // button left by a stale/reloaded copy
     const b = document.createElement("button");
+    b.id = "__shaurya_autofill_btn";
     b.textContent = "Autofill";
     b.style.cssText = "position:fixed;bottom:16px;right:16px;z-index:2147483647;background:#2563eb;color:#fff;border:0;border-radius:999px;padding:10px 16px;font:600 13px system-ui;cursor:pointer;opacity:.85;box-shadow:0 2px 8px rgba(0,0,0,.3)";
     b.onclick = async () => { const r = await run(); toast(r.error || `Filled ${r.filled} field(s)`); };

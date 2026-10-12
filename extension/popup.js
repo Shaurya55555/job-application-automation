@@ -64,11 +64,20 @@ $("resume").onchange = (e) => {
 $("fill").onclick = async () => {
   await save();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const ask = () => chrome.tabs.sendMessage(tab.id, { type: "FILL" });
   try {
-    const r = await chrome.tabs.sendMessage(tab.id, { type: "FILL" });
+    let r;
+    try {
+      r = await ask();
+    } catch {
+      // tab was open before the extension was (re)loaded: inject a fresh copy and retry
+      await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ["content.js"] });
+      await new Promise((res) => setTimeout(res, 300));
+      r = await ask();
+    }
     $("status").textContent = r?.error || `Filled ${r?.filled ?? 0} field(s).`;
   } catch {
-    $("status").textContent = "Reload the page once, then try again.";
+    $("status").textContent = "Could not reach this page. Press F5 on it, then try again.";
   }
 };
 
