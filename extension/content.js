@@ -358,16 +358,26 @@
       const want = norm(text);
       const hit = opts.find((o) => norm(o.innerText) === want) || opts.find((o) => norm(o.innerText).includes(want)) || (text === "Other" ? opts[0] : null);
       if (hit) { await pickResult(el, hit, want); return true; }
-      for (const t of ["keydown", "keyup"]) el.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
-      await sleep(400);
-      if (norm(el.value) && opts.length) return true;
+      // Workday-style boxes only list results after Enter: press it and poll for the results
+      for (const t of ["keydown", "keypress", "keyup"]) el.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+      let hit2 = null;
+      for (let i = 0; i < 12 && !hit2; i++) {
+        await sleep(250);
+        const o2 = visibleSuggestions().filter((o) => !o.contains(el));
+        if (o2.length) sawOptions = true;
+        hit2 = o2.find((o) => norm(o.innerText) === want) || o2.find((o) => norm(o.innerText).includes(want)) || null;
+      }
+      if (hit2) { await pickResult(el, hit2, want); return true; }
+      console.debug("[autofill] no result for", text);
     }
     if (fallbackOther && sawOptions) {
       // dropdown exists but nothing matched: follow the page's "type Other" instruction
       setNative(el, "Other");
       await sleep(700);
-      const o = visibleSuggestions()[0];
-      if (o) o.click();
+      for (const t of ["keydown", "keypress", "keyup"]) el.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+      await sleep(1200);
+      const o = visibleSuggestions().filter((x) => !x.contains(el))[0];
+      if (o) await pickResult(el, o, norm(o.innerText));
       return true;
     }
     setNative(el, attempts[0]); // no suggestion UI detected: leave the full value in place
