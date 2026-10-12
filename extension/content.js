@@ -14,6 +14,7 @@
     { key: "portfolio", patterns: ["portfolio", "personal (web)?site", "website", "other link"] },
     { key: "cgpa", patterns: ["cgpa", "gpa", "percentage", "aggregate"] },
     { key: "gradYear", patterns: ["graduation (year|date)", "passing year", "year of (graduation|passing)", "batch"] },
+    { key: "previousStipend", patterns: ["previous (stipend|salary|ctc|compensation)", "last (drawn )?(stipend|salary|ctc)", "earlier (stipend|salary)"] },
     { key: "currentCompany", patterns: ["current (company|employer|organi[sz]ation)", "company name", "employer"] },
     { key: "currentTitle", patterns: ["current (title|role|designation)", "job title", "designation"] },
     { key: "experience", patterns: ["years? of (work )?experience", "total experience", "experience \\(years\\)"] },
@@ -628,7 +629,9 @@
     }
     const profile = stored.profile;
     if (!profile) return { filled: 0, error: "Open the extension popup and save your profile first." };
-    profile.fields = { dob: "2004-11-29", noticePeriod: "Immediately available", ...profile.fields }; // profiles saved before this field existed
+    profile.fields = { dob: "2004-11-29", noticePeriod: "Immediately available", ...profile.fields };
+    if (!profile.fields.currentCtc) profile.fields.currentCtc = "0";
+    if (!profile.fields.previousStipend) profile.fields.previousStipend = "25000"; // profiles saved before this field existed
     const total = (profile.experience && profile.experience.length ? profile.experience : DEFAULT_EXPERIENCE).length;
     skillsDone = false;
     let r = await fill(profile);
