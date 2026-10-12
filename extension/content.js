@@ -430,6 +430,8 @@
     for (const el of inputs) {
       if (el.disabled || (el.readOnly && !sectionMap.has(el)) || !visible(el)) continue;
       if (el.value && el.value.trim() && !/^[mdy\/\-._\s]+$/i.test(el.value) && !profile.overwrite) continue;
+      const msBox = el.closest('[data-automation-id="multiSelectContainer"]');
+      if (msBox && msBox.querySelector('[data-automation-id="selectedItem"]') && !/(^|--)skills$/i.test(el.id || "") && wdFormKey(el).toLowerCase() !== "skills") continue;
       const label = labelFor(el);
       if (!label && !/(^|--)skills$/i.test(el.id || "")) continue;
       let val = null;
@@ -487,17 +489,23 @@
     for (const trig of document.querySelectorAll('[role="combobox"]:not(input):not(select), [aria-haspopup="listbox"]:not(input):not(select)')) {
       if (!visible(trig)) continue;
       const label = labelFor(trig);
-      if (!/degree|qualification/.test(label)) continue;
-      if (norm(trig.innerText) && !/^(select|choose|-)/.test(norm(trig.innerText))) continue; // already has a value
+      if (!label) continue;
+      const shown = norm(trig.innerText);
+      if (shown && !/^(select|choose|please|-)/.test(shown)) continue; // already has a value
+      const isDegree = /degree|qualification/.test(label);
+      const want = answerFor(label, profile) ?? booleanFor(label);
+      if (!isDegree && !want) continue;
       await realClick(trig);
       await sleep(800);
-      const opts = visibleSuggestions().map((o) => ({ text: o.innerText, el: o }));
+      const opts = visibleSuggestions().filter((o) => !o.contains(trig)).map((o) => ({ text: o.innerText, el: o }));
       let hit = null;
-      for (const syn of ["bachelor degree", "bachelor's degree", "bachelor", "b.tech", "undergraduate"]) {
+      const tries = isDegree ? ["bachelor degree", "bachelor's degree", "bachelor", "b.tech", "undergraduate"] : [String(want)];
+      for (const syn of tries) {
         hit = pickOption(opts, syn);
         if (hit) break;
       }
       if (hit) { await realClick(hit.el); filled++; await sleep(300); }
+      else { trig.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true })); await sleep(150); }
     }
 
     // native radio groups
