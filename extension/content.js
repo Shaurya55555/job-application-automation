@@ -308,7 +308,7 @@
   // ---- typeahead (type, wait, pick suggestion / press Enter) ----
   function visibleSuggestions() {
     return [...document.querySelectorAll('[role="option"], [role="listbox"] li, ul.ui-autocomplete li, .autocomplete-suggestions div, [class*="suggest"] li, [class*="option"], [role="radio"], label:has(input[type="radio"]), [role="menuitem"], [data-automation-id="promptOption"], [data-automation-id="menuItem"]')]
-      .filter((o) => visible(o) && norm(o.innerText).length > 0 && o.offsetHeight < 120);
+      .filter((o) => visible(o) && norm(o.innerText).length > 0 && o.offsetHeight < 120 && !o.closest('[data-automation-id="selectedItemList"]'));
   }
   async function realClick(node) {
     try { node.scrollIntoView({ block: "nearest" }); } catch {}
@@ -326,6 +326,8 @@
   const chosenIn = (el, want) => {
     const box = el.closest('[data-automation-id="multiSelectContainer"]') || el.closest('[data-automation-id^="formField"]') || el.parentElement;
     if (!box) return false;
+    const chips = box.querySelector('[data-automation-id="selectedItemList"]');
+    if (chips) return norm(chips.innerText || chips.textContent).includes(want);
     const c = box.cloneNode(true); // ignore the open results list, count only chips already chosen
     c.querySelectorAll('[role="listbox"], [role="option"], [data-automation-id="promptOption"], [data-automation-id*="popup" i], [data-automation-id*="menu" i]').forEach((n) => n.remove());
     return norm(c.innerText || c.textContent).includes(want);
@@ -405,7 +407,7 @@
 
   // Most compatible write: behaves like the user typing (execCommand), falls back to native setter, then per-char typing.
   async function writeValue(el, val) {
-    const same = () => norm(el.value) === norm(val) || el.value.replace(/\D/g, "") === String(val).replace(/\D/g, "") && /\d/.test(val) && !/[a-z]/i.test(val);
+    const same = () => norm(el.value) === norm(val) || (/^\d{1,4}$/.test(String(val)) && /^\d{1,4}$/.test(el.value) && +el.value === +val) || el.value.replace(/\D/g, "") === String(val).replace(/\D/g, "") && /\d/.test(val) && !/[a-z]/i.test(val);
     el.focus();
     if (el.select) el.select();
     try { document.execCommand("delete"); document.execCommand("insertText", false, val); } catch {}
