@@ -26,6 +26,7 @@
     { key: "college", patterns: ["college", "university", "institute", "school name", "institution"] },
     { key: "state", patterns: ["^state", "province"] },
     { key: "country", patterns: ["country", "nationality", "citizenship"] },
+    { key: "dob", patterns: ["date of birth", "birth ?date", "\\bdob\\b", "birthday"] },
     { key: "city", patterns: ["current (city|location)", "city", "location", "where are you based"] },
     { key: "gender", patterns: ["gender", "sex"] },
     { key: "name", patterns: ["^(full |your |candidate |applicant )?name\\b", "^name$"] }
@@ -213,8 +214,12 @@
       if (!visible(el)) continue;
       const label = labelFor(el);
       const sect = sectionOf(el);
-      const wd = /dateSection(Month|Year)/i.exec(el.getAttribute("data-automation-id") || "");
-      if (wd && (sect === "experience" || sect === "education")) {
+      const wd = /dateSection(Month|Day|Year)/i.exec(el.getAttribute("data-automation-id") || "");
+      if (wd && /birth|dob/i.test(wdFormKey(el) + " " + labelFor(el))) {
+        map.set(el, { sect: "dob", kind: "dob", idx: 0, part: wd[1].toLowerCase() });
+        continue;
+      }
+      if (wd && wd[1].toLowerCase() !== "day" && (sect === "experience" || sect === "education")) {
         const part = wd[1].toLowerCase();
         const key = wdFormKey(el);
         let role = /^startDate$|firstYearAttended/i.test(key) ? "from" : /^endDate$|lastYearAttended/i.test(key) ? "to" : null;
@@ -252,6 +257,12 @@
   function sectionalValue(el, info, profile) {
     if (!info) return null;
     const exps = profile.experience && profile.experience.length ? profile.experience : DEFAULT_EXPERIENCE;
+    if (info.kind === "dob") {
+      const iso = profile.fields.dob;
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+      const [y, m, d] = iso.split("-");
+      return info.part === "month" ? m : info.part === "day" ? d : y;
+    }
     if (info.part) {
       let iso;
       if (info.sect === "education") {
@@ -465,6 +476,11 @@
       }
       const info = sectionMap.get(el);
       if (info) { val = sectionalValue(el, info, profile); console.debug("[autofill]", info.sect, info.kind, info.idx, "->", val); }
+      if (val == null && /date of birth|birth ?date|\bdob\b|birthday/.test(label) && /^\d{4}-\d{2}-\d{2}$/.test(profile.fields.dob || "")) {
+        const [y, m, d] = profile.fields.dob.split("-");
+        const hint = (el.getAttribute("placeholder") || "") + " " + label;
+        val = el.type === "date" ? profile.fields.dob : /mm\s*[\/-]\s*dd/i.test(hint) ? `${m}/${d}/${y}` : /yyyy\s*[\/-]\s*mm/i.test(hint) ? `${y}-${m}-${d}` : `${d}/${m}/${y}`;
+      }
       if (val == null) val = answerFor(label, profile);
       if (val == null && el.type === "email") val = profile.fields.email;
       if (val == null && el.type === "tel") val = profile.fields.phone;

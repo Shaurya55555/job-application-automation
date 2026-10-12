@@ -25,6 +25,7 @@ const FIELD_DEFS = [
   { key: "currentCtc", label: "Current CTC", value: "", patterns: ["current (ctc|salary|compensation)"] },
   { key: "stipend", label: "Expected stipend / month (INR)", value: "40000-50000", patterns: ["stipend"] },
   { key: "expectedCtc", label: "Expected CTC (INR / year)", value: "1000000-1200000", patterns: ["expected (ctc|salary|compensation)", "salary expectation", "ctc", "lpa", "compensation"] },
+  { key: "dob", label: "Date of birth (YYYY-MM-DD)", value: "2004-11-29", patterns: ["date of birth", "birth ?date", "\\bdob\\b", "birthday"] },
   { key: "city", label: "Current city", value: "Bengaluru", patterns: ["current (city|location)", "city", "location", "where are you based"] },
   { key: "state", label: "State", value: "Karnataka", patterns: ["^state", "province"] },
   { key: "country", label: "Country", value: "India", patterns: ["country", "nationality", "citizenship"] },
