@@ -40,6 +40,11 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const norm = (s) => (s || "").toLowerCase().replace(/[*•]/g, " ").replace(/\brequired\b/g, " ").replace(/\s+/g, " ").trim();
   const visible = (el) => {
+    const aid = (el.getAttribute && el.getAttribute("data-automation-id")) || "";
+    if (/dateSection/i.test(aid)) {
+      const w = el.closest('[data-automation-id^="formField"]') || el.parentElement;
+      if (w) { const wr = w.getBoundingClientRect(); return wr.width > 0 || wr.height > 0; }
+    }
     const r = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
     return (r.width > 0 || r.height > 0) && cs.visibility !== "hidden" && cs.display !== "none";
@@ -122,7 +127,29 @@
       description: "- Optimized database queries, reducing data retrieval latency by 25% through query and index analysis\n- Implemented real-time data synchronization over WebSockets for low-latency updates\n- Built responsive UIs in React.js, collaborating with the team on code reviews and quality" }
   ];
 
+  // Workday wraps every field in <div data-automation-id="formField-<key>"> inside sections like workExperience-1.
+  function wdFormKey(el) {
+    let n = el;
+    for (let i = 0; i < 10 && n && n.getAttribute; i++, n = n.parentElement) {
+      const m = /^formField-(.+)$/.exec(n.getAttribute("data-automation-id") || "");
+      if (m) return m[1];
+    }
+    return "";
+  }
+  const WD_EXP = /^(jobTitle|companyName|location|currentlyWorkHere|startDate|endDate|roleDescription|description)$/i;
+  const WD_EDU = /^(school|degree|fieldOfStudy|gradeAverage|firstYearAttended|lastYearAttended)$/i;
+
   function sectionOf(el) {
+    const key = wdFormKey(el);
+    if (key) {
+      if (WD_EXP.test(key)) return "experience";
+      if (WD_EDU.test(key)) return "education";
+    }
+    for (let n = el, i = 0; i < 14 && n && n.getAttribute; i++, n = n.parentElement) {
+      const a = n.getAttribute("data-automation-id") || "";
+      if (/workExperience/i.test(a)) return "experience";
+      if (/^education|educationSection/i.test(a)) return "education";
+    }
     let found = null;
     for (const h of document.querySelectorAll('h1,h2,h3,h4,h5,h6,legend,[role="heading"]')) {
       if (h.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) found = h; else break;
@@ -154,6 +181,11 @@
   }
 
   function expKind(el, label) {
+    const k = wdFormKey(el).toLowerCase();
+    if (k === "roledescription" || k === "description") return "desc";
+    if (k === "jobtitle") return "title";
+    if (k === "companyname") return "company";
+    if (k === "location") return "location";
     if (isDateLike(el, label)) return "date";
     if (el.tagName === "TEXTAREA" || /descri|responsibilit|duties|summary|achievement/.test(label)) return "desc";
     if (/company|employer|organi[sz]ation/.test(label)) return "company";
@@ -173,9 +205,19 @@
       const wd = /dateSection(Month|Year)/i.exec(el.getAttribute("data-automation-id") || "");
       if (wd && (sect === "experience" || sect === "education")) {
         const part = wd[1].toLowerCase();
-        const ck = "wd_" + part;
-        const pair = (c[ck] = (c[ck] ?? -1) + 1);
-        map.set(el, { sect, kind: pair % 2 === 0 ? "from" : "to", idx: Math.floor(pair / 2), part });
+        const key = wdFormKey(el);
+        let role = /^startDate$|firstYearAttended/i.test(key) ? "from" : /^endDate$|lastYearAttended/i.test(key) ? "to" : null;
+        let idx;
+        if (role) {
+          const ck = `wd_${role}_${part}`;
+          idx = (c[ck] = (c[ck] ?? -1) + 1);
+        } else {
+          const ck = "wd_" + part;
+          const pair = (c[ck] = (c[ck] ?? -1) + 1);
+          role = pair % 2 === 0 ? "from" : "to";
+          idx = Math.floor(pair / 2);
+        }
+        map.set(el, { sect, kind: role, idx, part });
         continue;
       }
       if (sect === "experience") {
@@ -352,7 +394,9 @@
       } else if (info && !info.part && (info.kind === "from" || info.kind === "to") && el.type !== "date" && el.type !== "month") {
         await typeDate(el, val);
       } else {
-        await writeValue(el, val);
+        if (info?.part) { el.closest('[data-automation-id="dateInputWrapper"], [data-automation-id^="formField"]')?.querySelector('[data-automation-id^="dateSection"][data-automation-id$="display"]')?.click?.(); }
+        const ok = await writeValue(el, val);
+        console.debug("[autofill] wrote", JSON.stringify(label.slice(0, 30)), "->", JSON.stringify(val.slice(0, 20)), ok ? "ok" : "REJECTED by page");
       }
       filled++;
     }
