@@ -622,6 +622,7 @@
     }
     const profile = stored.profile;
     if (!profile) return { filled: 0, error: "Open the extension popup and save your profile first." };
+    profile.fields = { dob: "2004-11-29", ...profile.fields }; // profiles saved before this field existed
     const total = (profile.experience && profile.experience.length ? profile.experience : DEFAULT_EXPERIENCE).length;
     skillsDone = false;
     let r = await fill(profile);
