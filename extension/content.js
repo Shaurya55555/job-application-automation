@@ -338,6 +338,27 @@
     return false;
   }
 
+  // Multi-select "type to add" boxes (Workday skills): type, press Enter to search, then click the matching result.
+  async function addTag(el, text) {
+    const key = (t) => el.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+    await writeValue(el, text);
+    key("keydown"); key("keypress"); key("keyup");
+    const want = norm(text);
+    let hit = null;
+    for (let i = 0; i < 12 && !hit; i++) {
+      await sleep(250);
+      const opts = visibleSuggestions().filter((o) => !o.contains(el));
+      hit = opts.find((o) => norm(o.innerText) === want) || opts.find((o) => norm(o.innerText).includes(want)) || null;
+    }
+    console.debug("[autofill] skill", text, hit ? "-> " + norm(hit.innerText).slice(0, 30) : "-> no match");
+    if (hit) {
+      for (const t of ["mousedown", "mouseup", "click"]) hit.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window }));
+      await sleep(350);
+    }
+    if (el.value) { el.focus(); if (el.select) el.select(); try { document.execCommand("delete"); } catch {} if (el.value) setNative(el, ""); }
+    return !!hit;
+  }
+
   // Most compatible write: behaves like the user typing (execCommand), falls back to native setter, then per-char typing.
   async function writeValue(el, val) {
     const same = () => norm(el.value) === norm(val) || el.value.replace(/\D/g, "") === String(val).replace(/\D/g, "") && /\d/.test(val) && !/[a-z]/i.test(val);
@@ -371,10 +392,7 @@
         if (skillsDone) continue; // fill() runs several passes; add skills only once per run
         skillsDone = true;
         const list = String(profile.fields.skills).split(/[,;]/).map((x) => x.trim()).filter(Boolean).slice(0, 14);
-        for (const skill of list) {
-          await typeahead(el, [skill], false, 600);
-          if (el.value) setNative(el, ""); // not consumed as a tag: clear for the next one
-        }
+        for (const skill of list) await addTag(el, skill);
         filled++;
         continue;
       }
