@@ -30,7 +30,7 @@
     { key: "dob", patterns: ["date of birth", "birth ?date", "\\bdob\\b", "birthday"] },
     { key: "city", patterns: ["current (city|location)", "city", "location", "where are you based"] },
     { key: "gender", patterns: ["gender", "sex"] },
-    { key: "name", patterns: ["^(full |your |candidate |applicant )?name\\b", "^name$"] }
+    { key: "name", patterns: ["^(full |your |candidate |applicant )?name\\b", "^name$", "(what is|enter|state|write) your (full )?name", "^your (full )?name", "^name of (the )?(candidate|applicant)"] }
   ];
   const BOOLEAN_DEFS = [
     { patterns: ["relocat"], answer: "Yes" },
@@ -111,7 +111,8 @@
     { q: "\\bnoc\\b|no objection", a: "Yes" },
     { q: "in-?person|on-?site|work from (the )?office", a: "Yes" },
     { q: "higher (education|stud)", a: "No" },
-    { q: "backlog", a: "No active backlogs" }
+    { q: "backlog", a: "No active backlogs" },
+    { q: "how many internships|number of internships|internships .*(completed|done|prior)", a: "2" }
   ];
   function matchCustom(label, profile) {
     for (const qa of [...(profile.custom || []), ...DEFAULT_CUSTOM]) {
@@ -631,6 +632,14 @@
     if (!profile) return { filled: 0, error: "Open the extension popup and save your profile first." };
     profile.fields = { dob: "2004-11-29", noticePeriod: "Immediately available", ...profile.fields };
     if (!profile.fields.currentCtc) profile.fields.currentCtc = "0";
+    {
+      // current semester from the course start month (two semesters a year), as an ordinal like "7th semester"
+      const [sy, sm] = String(profile.fields.eduFrom || "2023-08").split("-").map(Number);
+      const now = new Date();
+      const sem = Math.max(1, Math.min(8, Math.floor(((now.getFullYear() - sy) * 12 + (now.getMonth() + 1 - sm)) / 6) + 1));
+      const ord = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"][sem - 1];
+      profile.custom = [...(profile.custom || []), { q: "(which|what|current) semester", a: ord + " semester" }];
+    }
     if (!profile.fields.previousStipend) profile.fields.previousStipend = "25000"; // profiles saved before this field existed
     const total = (profile.experience && profile.experience.length ? profile.experience : DEFAULT_EXPERIENCE).length;
     skillsDone = false;

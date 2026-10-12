@@ -31,7 +31,7 @@ const FIELD_DEFS = [
   { key: "state", label: "State", value: "Karnataka", patterns: ["^state", "province"] },
   { key: "country", label: "Country", value: "India", patterns: ["country", "nationality", "citizenship"] },
   { key: "gender", label: "Gender", value: "Male", patterns: ["gender", "sex"] },
-  { key: "name", label: "Full name", value: "Shaurya Bajpai", patterns: ["^(full |your |candidate |applicant )?name\\b", "^name$"] }
+  { key: "name", label: "Full name", value: "Shaurya Bajpai", patterns: ["^(full |your |candidate |applicant )?name\\b", "^name$", "(what is|enter|state|write) your (full )?name", "^your (full )?name", "^name of (the )?(candidate|applicant)"] }
 ];
 
 // Yes/No style answers applied to radio / checkbox / select questions.
