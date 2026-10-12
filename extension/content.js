@@ -310,6 +310,42 @@
     return [...document.querySelectorAll('[role="option"], [role="listbox"] li, ul.ui-autocomplete li, .autocomplete-suggestions div, [class*="suggest"] li, [class*="option"], [role="radio"], label:has(input[type="radio"]), [role="menuitem"], [data-automation-id="promptOption"], [data-automation-id="menuItem"]')]
       .filter((o) => visible(o) && norm(o.innerText).length > 0 && o.offsetHeight < 120);
   }
+  async function realClick(node) {
+    try { node.scrollIntoView({ block: "nearest" }); } catch {}
+    const r = node.getBoundingClientRect();
+    const o = { bubbles: true, cancelable: true, view: window, button: 0, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    for (const t of ["pointerover", "mouseover", "pointermove", "mousemove", "pointerdown", "mousedown"]) {
+      node.dispatchEvent(t.startsWith("pointer") ? new PointerEvent(t, { ...o, pointerType: "mouse", isPrimary: true }) : new MouseEvent(t, o));
+    }
+    try { node.focus(); } catch {}
+    for (const t of ["pointerup", "mouseup", "click"]) {
+      node.dispatchEvent(t.startsWith("pointer") ? new PointerEvent(t, { ...o, pointerType: "mouse", isPrimary: true }) : new MouseEvent(t, o));
+    }
+  }
+  const keyEv = (el, key, code, kc) => { for (const t of ["keydown", "keyup"]) el.dispatchEvent(new KeyboardEvent(t, { key, code, keyCode: kc, which: kc, bubbles: true, cancelable: true })); };
+  const chosenIn = (el, want) => {
+    const box = el.closest('[data-automation-id="multiSelectContainer"]') || el.closest('[data-automation-id^="formField"]') || el.parentElement;
+    if (!box) return false;
+    const c = box.cloneNode(true); // ignore the open results list, count only chips already chosen
+    c.querySelectorAll('[role="listbox"], [role="option"], [data-automation-id="promptOption"], [data-automation-id*="popup" i], [data-automation-id*="menu" i]').forEach((n) => n.remove());
+    return norm(c.innerText || c.textContent).includes(want);
+  };
+  // pick a result: click it like a user, check it landed in the widget, else try the keyboard
+  async function pickResult(el, hit, want) {
+    console.debug("[autofill] option html:", hit.outerHTML.slice(0, 260));
+    const nodes = [hit, hit.querySelector("[data-automation-id='promptLeafNode'], [data-automation-id='menuItemLabel'], div, span, label, input")].filter(Boolean);
+    for (const n of nodes) {
+      await realClick(n);
+      await sleep(350);
+      if (chosenIn(el, want) || !document.contains(hit)) return true;
+    }
+    el.focus();
+    keyEv(el, "ArrowDown", "ArrowDown", 40);
+    await sleep(150);
+    keyEv(el, "Enter", "Enter", 13);
+    await sleep(350);
+    return chosenIn(el, want);
+  }
   async function typeahead(el, attempts, fallbackOther, waitMs = 900) {
     let sawOptions = false;
     for (const text of attempts) {
@@ -321,7 +357,7 @@
       if (opts.length) sawOptions = true;
       const want = norm(text);
       const hit = opts.find((o) => norm(o.innerText) === want) || opts.find((o) => norm(o.innerText).includes(want)) || (text === "Other" ? opts[0] : null);
-      if (hit) { hit.click(); await sleep(250); return true; }
+      if (hit) { await pickResult(el, hit, want); return true; }
       for (const t of ["keydown", "keyup"]) el.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
       await sleep(400);
       if (norm(el.value) && opts.length) return true;
@@ -341,9 +377,10 @@
   // Multi-select "type to add" boxes (Workday skills): type, press Enter to search, then click the matching result.
   async function addTag(el, text) {
     const key = (t) => el.dispatchEvent(new KeyboardEvent(t, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+    const want = norm(text);
+    if (chosenIn(el, want)) return true;
     await writeValue(el, text);
     key("keydown"); key("keypress"); key("keyup");
-    const want = norm(text);
     let hit = null;
     for (let i = 0; i < 12 && !hit; i++) {
       await sleep(250);
@@ -351,10 +388,7 @@
       hit = opts.find((o) => norm(o.innerText) === want) || opts.find((o) => norm(o.innerText).includes(want)) || null;
     }
     console.debug("[autofill] skill", text, hit ? "-> " + norm(hit.innerText).slice(0, 30) : "-> no match");
-    if (hit) {
-      for (const t of ["mousedown", "mouseup", "click"]) hit.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window }));
-      await sleep(350);
-    }
+    if (hit) console.debug("[autofill] skill", text, "selected:", await pickResult(el, hit, want));
     if (el.value) { el.focus(); if (el.select) el.select(); try { document.execCommand("delete"); } catch {} if (el.value) setNative(el, ""); }
     return !!hit;
   }
