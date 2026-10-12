@@ -405,6 +405,13 @@
     return !!hit;
   }
 
+  function commit(el) {
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    el.dispatchEvent(new FocusEvent("blur"));
+    try { el.blur(); } catch {}
+  }
+
   // Most compatible write: behaves like the user typing (execCommand), falls back to native setter, then per-char typing.
   async function writeValue(el, val) {
     const same = () => norm(el.value) === norm(val) || (/^\d{1,4}$/.test(String(val)) && /^\d{1,4}$/.test(el.value) && +el.value === +val) || el.value.replace(/\D/g, "") === String(val).replace(/\D/g, "") && /\d/.test(val) && !/[a-z]/i.test(val);
@@ -460,9 +467,11 @@
         await typeahead(el, ["Computer Science", "Computer Engineering", val, "Computer"], false);
       } else if (info && !info.part && (info.kind === "from" || info.kind === "to") && el.type !== "date" && el.type !== "month") {
         await typeDate(el, val);
+        commit(el);
       } else {
         if (info?.part) { el.closest('[data-automation-id="dateInputWrapper"], [data-automation-id^="formField"]')?.querySelector('[data-automation-id^="dateSection"][data-automation-id$="display"]')?.click?.(); }
         const ok = await writeValue(el, val);
+        commit(el);
         console.debug("[autofill] wrote", JSON.stringify(label.slice(0, 30)), "->", JSON.stringify(val.slice(0, 20)), ok ? "ok" : "REJECTED by page");
       }
       filled++;
@@ -607,6 +616,7 @@
     // final sweep: fields that rendered late or were reset by the page
     const r3 = await fill(profile);
     r.filled += r3.filled;
+    try { document.activeElement?.blur?.(); } catch {}
     return r;
   }
 
