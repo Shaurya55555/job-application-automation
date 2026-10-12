@@ -96,8 +96,11 @@
 
   function matchKey(label, profile) {
     for (const def of FIELD_DEFS) {
-      if (!profile.fields[def.key]) continue;
-      if (def.patterns.some((p) => new RegExp(p, "i").test(label))) return def.key;
+      if (def.patterns.some((p) => new RegExp(p, "i").test(label))) {
+        // a specific field with no saved value must not fall through to a looser one
+        // (an empty "Current CTC" would otherwise take the Expected CTC)
+        return profile.fields[def.key] ? def.key : null;
+      }
     }
     return null;
   }
