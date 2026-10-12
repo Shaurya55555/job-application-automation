@@ -488,15 +488,16 @@
       if (!visible(trig)) continue;
       const label = labelFor(trig);
       if (!/degree|qualification/.test(label)) continue;
-      trig.click();
-      await sleep(350);
+      if (norm(trig.innerText) && !/^(select|choose|-)/.test(norm(trig.innerText))) continue; // already has a value
+      await realClick(trig);
+      await sleep(800);
       const opts = visibleSuggestions().map((o) => ({ text: o.innerText, el: o }));
       let hit = null;
       for (const syn of ["bachelor degree", "bachelor's degree", "bachelor", "b.tech", "undergraduate"]) {
         hit = pickOption(opts, syn);
         if (hit) break;
       }
-      if (hit) { hit.el.click(); filled++; await sleep(200); }
+      if (hit) { await realClick(hit.el); filled++; await sleep(300); }
     }
 
     // native radio groups
