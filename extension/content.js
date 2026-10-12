@@ -100,8 +100,16 @@
     }
     return null;
   }
+  // Screening answers the user gave on the Airbus form; the popup's custom Q&A rows are checked first.
+  const DEFAULT_CUSTOM = [
+    { q: "academic journey|start of your internship", a: "Final year" },
+    { q: "\bnoc\b|no objection", a: "Yes" },
+    { q: "in-?person|on-?site|work from (the )?office", a: "Yes" },
+    { q: "higher (education|stud)", a: "No" },
+    { q: "backlog", a: "No active backlogs" }
+  ];
   function matchCustom(label, profile) {
-    for (const qa of profile.custom || []) {
+    for (const qa of [...(profile.custom || []), ...DEFAULT_CUSTOM]) {
       if (!qa.q || !qa.a) continue;
       try { if (new RegExp(qa.q, "i").test(label)) return qa.a; } catch { if (label.includes(qa.q.toLowerCase())) return qa.a; }
     }
