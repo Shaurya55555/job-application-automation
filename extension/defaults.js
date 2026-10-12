@@ -27,7 +27,7 @@ const FIELD_DEFS = [
   { key: "expectedCtc", label: "Expected CTC (INR / year)", value: "1000000-1200000", patterns: ["expected (ctc|salary|compensation)", "salary expectation", "ctc", "lpa", "compensation"] },
   { key: "city", label: "Current city", value: "Bengaluru", patterns: ["current (city|location)", "city", "location", "where are you based"] },
   { key: "state", label: "State", value: "Karnataka", patterns: ["^state", "province"] },
-  { key: "country", label: "Country", value: "India", patterns: ["country"] },
+  { key: "country", label: "Country", value: "India", patterns: ["country", "nationality", "citizenship"] },
   { key: "gender", label: "Gender", value: "Male", patterns: ["gender", "sex"] },
   { key: "name", label: "Full name", value: "Shaurya Bajpai", patterns: ["^(full |your |candidate |applicant )?name\\b", "^name$"] }
 ];

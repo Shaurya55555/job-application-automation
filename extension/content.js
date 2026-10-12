@@ -25,7 +25,7 @@
     { key: "degree", patterns: ["degree", "qualification"] },
     { key: "college", patterns: ["college", "university", "institute", "school name", "institution"] },
     { key: "state", patterns: ["^state", "province"] },
-    { key: "country", patterns: ["country"] },
+    { key: "country", patterns: ["country", "nationality", "citizenship"] },
     { key: "city", patterns: ["current (city|location)", "city", "location", "where are you based"] },
     { key: "gender", patterns: ["gender", "sex"] },
     { key: "name", patterns: ["^(full |your |candidate |applicant )?name\\b", "^name$"] }
