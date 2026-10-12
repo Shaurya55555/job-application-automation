@@ -385,10 +385,11 @@
       if (el.disabled || (el.readOnly && !sectionMap.has(el)) || !visible(el)) continue;
       if (el.value && el.value.trim() && !/^[mdy\/\-._\s]+$/i.test(el.value) && !profile.overwrite) continue;
       const label = labelFor(el);
-      if (!label) continue;
+      if (!label && !/(^|--)skills$/i.test(el.id || "")) continue;
       let val = null;
       const sect = sectionOf(el);
-      if (/\bskills?\b/.test(label) && !/experience|years|rating|level/.test(label) && profile.fields.skills) {
+      const wdSkills = wdFormKey(el).toLowerCase() === "skills" || /(^|--)skills$/i.test(el.id || "");
+      if ((wdSkills || /\bskills?\b/.test(label)) && !/experience|years|rating|level/.test(label) && profile.fields.skills) {
         if (skillsDone) continue; // fill() runs several passes; add skills only once per run
         skillsDone = true;
         const list = String(profile.fields.skills).split(/[,;]/).map((x) => x.trim()).filter(Boolean).slice(0, 14);
