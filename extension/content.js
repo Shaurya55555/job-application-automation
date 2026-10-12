@@ -73,6 +73,9 @@
     // Generic: fieldset legend / nearest preceding text in the field wrapper
     const fs = el.closest("fieldset");
     if (fs && fs.querySelector("legend")) parts.push(fs.querySelector("legend").innerText);
+    // Workday questions: the question text sits in the wrapper, not in a <label for>
+    const wf = el.closest('[data-automation-id^="formField"]');
+    if (wf && wf.innerText && wf.innerText.length < 400) parts.push(wf.innerText);
     if (parts.every((p) => !norm(p))) {
       const box = el.closest('div[class*="field"], div[class*="form-group"], div[class*="question"], li, .row, div');
       if (box && box.innerText && box.innerText.length < 200) parts.push(box.innerText);
