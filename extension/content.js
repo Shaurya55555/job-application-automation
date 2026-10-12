@@ -103,7 +103,7 @@
   // Screening answers the user gave on the Airbus form; the popup's custom Q&A rows are checked first.
   const DEFAULT_CUSTOM = [
     { q: "academic journey|start of your internship", a: "Final year" },
-    { q: "\bnoc\b|no objection", a: "Yes" },
+    { q: "\\bnoc\\b|no objection", a: "Yes" },
     { q: "in-?person|on-?site|work from (the )?office", a: "Yes" },
     { q: "higher (education|stud)", a: "No" },
     { q: "backlog", a: "No active backlogs" }
